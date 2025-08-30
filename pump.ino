@@ -1,10 +1,10 @@
 const int flowSensorPin = 2;
-const int pumpPin = 13;
+const int pumpPin = 7;
 
-const unsigned long PRIME_DURATION = 5 * 1000; // 5 seconds
-const unsigned long REFILL_WAIT = 10 * 1000; // 10 seconds
-const unsigned long MAX_PUMP_TIME = 60 * 1000; // 1 minute
-const unsigned long NO_FLOW_DEBOUNCE = 5 * 1000; // 5 seconds
+const unsigned long PRIME_DURATION = 5000UL; // 5 seconds
+const unsigned long REFILL_WAIT = 60000UL; // 1 minute
+const unsigned long MAX_PUMP_TIME = 120000UL; // 2 minutes
+const unsigned long NO_FLOW_DEBOUNCE = 5000UL; // 5 seconds
 
 enum PumpState {
   PRIMING,
@@ -49,7 +49,7 @@ void loop() {
   
   switch (currentState) {
     case PRIMING:
-      digitalWrite(pumpPin, HIGH);
+      digitalWrite(pumpPin, LOW);
       
       if (flowDetected) {
         Serial.println("Flow detected! State: PUMPING");
@@ -59,12 +59,12 @@ void loop() {
         Serial.println("Priming timeout. State: STOPPED");
         currentState = STOPPED;
         stateStartTime = currentTime;
-        digitalWrite(pumpPin, LOW);
+        digitalWrite(pumpPin, HIGH);
       }
       break;
       
     case PUMPING:
-      digitalWrite(pumpPin, HIGH);
+      digitalWrite(pumpPin, LOW);
       
       if (!flowDetected) {
         if (noFlowStartTime == 0) {
@@ -74,7 +74,7 @@ void loop() {
           Serial.println("No flow for 5 seconds. State: STOPPED");
           currentState = STOPPED;
           stateStartTime = currentTime;
-          digitalWrite(pumpPin, LOW);
+          digitalWrite(pumpPin, HIGH);
           noFlowStartTime = 0;
         }
       } else {
@@ -88,21 +88,21 @@ void loop() {
         Serial.println("Max pump time reached. State: STOPPED");
         currentState = STOPPED;
         stateStartTime = currentTime;
-        digitalWrite(pumpPin, LOW);
+        digitalWrite(pumpPin, HIGH);
         noFlowStartTime = 0;
       }
       break;
       
     case STOPPED:
-      digitalWrite(pumpPin, LOW);
-      Serial.println("State: WAITING (10 seconds)");
+      digitalWrite(pumpPin, HIGH);
+      Serial.println("State: WAITING (60 seconds)");
       currentState = WAITING;
       stateStartTime = currentTime;
       noFlowStartTime = 0;
       break;
       
     case WAITING:
-      digitalWrite(pumpPin, LOW);
+      digitalWrite(pumpPin, HIGH);
       
       if (currentTime - stateStartTime >= REFILL_WAIT) {
         Serial.print("Wait complete after ");
@@ -111,19 +111,6 @@ void loop() {
         currentState = PRIMING;
         stateStartTime = currentTime;
         noFlowStartTime = 0;
-      } else {
-        // Show waiting progress every 15 seconds
-        static unsigned long lastWaitLog = 0;
-        if (currentTime - lastWaitLog >= 15000) {
-          unsigned long timeInWait = currentTime - stateStartTime;
-          if (timeInWait < REFILL_WAIT) {
-            unsigned long remainingTime = (REFILL_WAIT - timeInWait) / 1000;
-            Serial.print("Still waiting... ");
-            Serial.print(remainingTime);
-            Serial.println(" seconds remaining");
-          }
-          lastWaitLog = currentTime;
-        }
       }
       break;
   }
