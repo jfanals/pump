@@ -20,7 +20,8 @@ enum PumpState {
 PumpState currentState = PRIMING;
 unsigned long stateStartTime = 0;
 unsigned long noFlowStartTime = 0;
-int pumpCycleCount = 0;
+unsigned long totalPumpTimeMilliseconds = 0;
+unsigned long pumpSessionStartTime = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -33,7 +34,7 @@ void setup() {
   Serial.println("State: PRIMING");
 }
 
-void displayCycleCount(int cycleCount) {
+void displayPumpMinutes(int totalMinutes) {
   static unsigned long blinkStartTime = 0;
   static int currentBlink = 0;
   static bool ledState = false;
@@ -63,7 +64,7 @@ void displayCycleCount(int cycleCount) {
   }
   
   // Handle blinking
-  if (currentBlink < cycleCount) {
+  if (currentBlink < totalMinutes) {
     if (currentTime - blinkStartTime >= BLINK_DURATION) {
       ledState = !ledState;
       digitalWrite(ledPin, ledState ? HIGH : LOW);
@@ -85,6 +86,7 @@ void displayCycleCount(int cycleCount) {
 void loop() {
   unsigned long currentTime = millis();
   bool flowDetected = digitalRead(flowSensorPin) == LOW;
+  int totalMinutes = totalPumpTimeMilliseconds / 60000UL; // Convert ms to minutes
   
   // Debug info every 10 seconds
   static unsigned long lastDebug = 0;
@@ -109,9 +111,7 @@ void loop() {
       
       if (flowDetected) {
         Serial.println("Flow detected! State: PUMPING");
-        pumpCycleCount++; // Increment cycle count for new pumping session
-        Serial.print("Starting pump cycle #");
-        Serial.println(pumpCycleCount);
+        pumpSessionStartTime = currentTime; // Start timing this pumping session
         currentState = PUMPING;
         stateStartTime = currentTime;
       } else if (currentTime - stateStartTime >= PRIME_DURATION) {
@@ -130,7 +130,14 @@ void loop() {
           Serial.println("No flow detected, starting debounce timer");
           noFlowStartTime = currentTime;
         } else if (currentTime - noFlowStartTime >= NO_FLOW_DEBOUNCE) {
-          Serial.println("No flow for 5 seconds. State: STOPPED");
+          // Add pump session time to total
+          unsigned long sessionTimeMs = currentTime - pumpSessionStartTime;
+          totalPumpTimeMilliseconds += sessionTimeMs;
+          Serial.print("No flow for 5 seconds. State: STOPPED. Session pumped for ");
+          Serial.print(sessionTimeMs / 1000UL);
+          Serial.print(" seconds. Total: ");
+          Serial.print(totalPumpTimeMilliseconds / 1000UL);
+          Serial.println(" seconds");
           currentState = STOPPED;
           stateStartTime = currentTime;
           digitalWrite(pumpPin, HIGH);
@@ -144,7 +151,14 @@ void loop() {
       }
       
       if (currentTime - stateStartTime >= MAX_PUMP_TIME) {
-        Serial.println("Max pump time reached. State: STOPPED");
+        // Add pump session time to total
+        unsigned long sessionTimeMs = currentTime - pumpSessionStartTime;
+        totalPumpTimeMilliseconds += sessionTimeMs;
+        Serial.print("Max pump time reached. State: STOPPED. Session pumped for ");
+        Serial.print(sessionTimeMs / 1000UL);
+        Serial.print(" seconds. Total: ");
+        Serial.print(totalPumpTimeMilliseconds / 1000UL);
+        Serial.println(" seconds");
         currentState = STOPPED;
         stateStartTime = currentTime;
         digitalWrite(pumpPin, HIGH);
@@ -154,9 +168,11 @@ void loop() {
       
     case STOPPED:
       digitalWrite(pumpPin, HIGH);
-      Serial.print("State: WAITING (60 seconds) - Completed ");
-      Serial.print(pumpCycleCount);
-      Serial.println(" pump cycles");
+      Serial.print("State: WAITING (1 hour) - Total pump time: ");
+      Serial.print(totalPumpTimeMilliseconds / 1000UL);
+      Serial.print(" seconds (");
+      Serial.print(totalMinutes);
+      Serial.println(" minutes)");
       currentState = WAITING;
       stateStartTime = currentTime;
       noFlowStartTime = 0;
@@ -165,9 +181,9 @@ void loop() {
     case WAITING:
       digitalWrite(pumpPin, HIGH);
       
-      // Display cycle count via LED blinking
-      if (pumpCycleCount > 0) {
-        displayCycleCount(pumpCycleCount);
+      // Display total pump minutes via LED blinking
+      if (totalMinutes > 0) {
+        displayPumpMinutes(totalMinutes);
       }
       
       if (currentTime - stateStartTime >= REFILL_WAIT) {
