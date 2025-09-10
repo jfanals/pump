@@ -2,10 +2,10 @@ const int flowSensorPin = 2;
 const int pumpPin = 7;
 const int ledPin = 13;
 
-const unsigned long PRIME_DURATION = 5000UL; // 5 seconds
+const unsigned long PRIME_DURATION = 15000UL; // 15 seconds
 // const unsigned long REFILL_WAIT = 60000UL; // 1 minute (for testing)
-const unsigned long REFILL_WAIT = 3600000UL; // 1 hour
-const unsigned long MAX_PUMP_TIME = 1200000UL; // 20 minutes
+const unsigned long REFILL_WAIT = 10800000UL; // 3 hour
+const unsigned long MAX_PUMP_TIME = 600000UL; // 10 minutes
 const unsigned long NO_FLOW_DEBOUNCE = 5000UL; // 5 seconds
 const unsigned long BLINK_DURATION = 500UL; // 500ms blink
 const unsigned long PAUSE_DURATION = 2000UL; // 2 second pause
